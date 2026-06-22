@@ -1,0 +1,10 @@
+[project]
+name = "air-sensor"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "esphome>=2026.6.2",
+    "pyserial>=3.5",
+]

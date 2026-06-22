@@ -1,0 +1,43 @@
+esphome:
+  name: air-monitor
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+  level: DEBUG
+
+i2c:
+  sda: GPIO8
+  scl: GPIO9
+  scan: true
+
+# Moved away from locked GPIO 20/21 to safe GPIO 6/7
+uart:
+  - id: pms_uart
+    rx_pin: GPIO6
+    tx_pin: GPIO7
+    baud_rate: 9600
+
+sensor:
+  - platform: sht3xd
+    temperature:
+      name: "Room Temperature"
+    humidity:
+      name: "Room Humidity"
+    address: 0x44
+    update_interval: 30s
+
+  - platform: pmsx003
+    type: PMSX003
+    uart_id: pms_uart
+    pm_1_0:
+      name: "PM1.0"
+    pm_2_5:
+      name: "PM2.5"
+    pm_10_0:
+      name: "PM10"
+    update_interval: 30s
