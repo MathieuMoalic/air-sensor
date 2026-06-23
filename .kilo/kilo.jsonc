@@ -3,7 +3,7 @@
 
   // The model string is provider_id/model_id.
   // Replace this with the exact OpenRouter model slug you want.
-  "model": "openrouter/anthropic/claude-sonnet-4.5",
+  "model": "openrouter/z-ai/glm-5.2",
 
   "provider": {
     "openrouter": {

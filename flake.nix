@@ -75,6 +75,9 @@
           python313
           uv
 
+          nodejs_22
+          pnpm
+
           curl
           cacert
           git

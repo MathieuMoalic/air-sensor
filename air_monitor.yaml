@@ -54,7 +54,7 @@ sensor:
       name: "Room Humidity"
       id: room_humidity
     address: 0x44
-    update_interval: 30min
+    update_interval: 10min
 
   - platform: pmsx003
     type: PMSX003
@@ -68,4 +68,4 @@ sensor:
     pm_10_0:
       name: "PM10"
       id: pm_10_0
-    update_interval: 30min
+    update_interval: 10min
