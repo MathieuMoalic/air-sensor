@@ -1,0 +1,79 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+
+  // The model string is provider_id/model_id.
+  // Replace this with the exact OpenRouter model slug you want.
+  "model": "openrouter/anthropic/claude-sonnet-4.5",
+
+  "provider": {
+    "openrouter": {
+      "options": {
+        "apiKey": "{env:OPENROUTER_API_KEY}"
+      },
+
+      "models": {
+        "anthropic/claude-sonnet-4.5": {
+          "options": {
+            // Optional OpenRouter middle-out transform for long prompts.
+            "transforms": ["middle-out"],
+
+            // Optional OpenRouter routing/privacy preferences.
+            "provider": {
+              "sort": "latency",
+              "data_collection": "deny"
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "mcp": {
+    "codebase-memory": {
+      "type": "local",
+      "command": ["codebase-memory-mcp"],
+      "environment": {
+        "CBM_CACHE_DIR": "/home/mat/projects/air-sensor/.cache/codebase-memory-mcp"
+      },
+      "enabled": true,
+      "timeout": 30000
+    },
+
+    "headroom": {
+      "type": "local",
+      "command": ["headroom", "mcp", "serve"],
+      "environment": {
+        "HEADROOM_UPDATE_CHECK": "off",
+        "HEADROOM_TELEMETRY": "off"
+      },
+      "enabled": true,
+      "timeout": 30000
+    }
+  },
+
+  "permission": {
+    // Safe to allow; read-only or local analysis.
+    "codebase_memory_list_projects": "allow",
+    "codebase_memory_search_graph": "allow",
+    "codebase_memory_query_graph": "allow",
+    "codebase_memory_trace_path": "allow",
+    "codebase_memory_get_code_snippet": "allow",
+    "codebase_memory_get_architecture": "allow",
+    "codebase_memory_search_code": "allow",
+    "codebase_memory_index_status": "allow",
+    "codebase_memory_detect_changes": "allow",
+
+    // Let Kilo ask before reindexing or mutating ADR/project data.
+    "codebase_memory_index_repository": "ask",
+    "codebase_memory_delete_project": "ask",
+    "codebase_memory_manage_adr": "ask",
+    "codebase_memory_ingest_traces": "ask",
+
+    // Headroom compression is safe to allow.
+    "headroom_*": "allow"
+  },
+
+  "experimental": {
+    "openTelemetry": false
+  }
+}
