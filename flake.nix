@@ -14,7 +14,6 @@
     pkgs = import nixpkgs {
       inherit system;
     };
-    lib = pkgs.lib;
 
     codebase-memory-mcp = pkgs.stdenvNoCC.mkDerivation rec {
       pname = "codebase-memory-mcp";
@@ -66,14 +65,11 @@
         ln -s "${kilocode-cli}/bin/kilocode" "$out/bin/kilocode"
       '';
 
-    # Production build of the SvelteKit dashboard (adapter-node).
-    # Production build of the SvelteKit dashboard (adapter-node).
-    # Produces a runnable server: $out/bin/air-monitor
     webPackage = (pkgs.buildNpmPackage.override {nodejs = pkgs.nodejs_22;}) {
-      pname = "air-monitor";
+      pname = "air";
       version = "0.1.0";
       src = ./web;
-      npmDepsHash = "sha256-lpUtxfjolCUmkKTo8GvEdxFtsaWf4uMgRVhvcj1XuRQ=";
+      npmDepsHash = "sha256-Dv9/ie8mshHEu6PIudXI1AN/d0/vZSVhxS8cUne7+80=";
 
       npmDepsFetcherVersion = 2;
 
@@ -87,26 +83,26 @@
       installPhase = ''
         runHook preInstall
 
-        mkdir -p $out/lib/air-monitor
-        cp -r build/* $out/lib/air-monitor/
+        mkdir -p $out/lib/air
+        cp -r build/* $out/lib/air/
 
         # adapter-node keeps better-sqlite3 in node_modules; copy it so the
         # native addon is resolvable at runtime.
-        cp -r node_modules $out/lib/air-monitor/node_modules
+        cp -r node_modules $out/lib/air/node_modules
 
         mkdir -p $out/bin
-        cat > $out/bin/air-monitor <<EOF
+        cat > $out/bin/air <<EOF
         #!${pkgs.runtimeShell}
-        exec ${pkgs.nodejs_22}/bin/node $out/lib/air-monitor/index.js "\$@"
+        exec ${pkgs.nodejs_22}/bin/node $out/lib/air/index.js "\$@"
         EOF
-        chmod +x $out/bin/air-monitor
+        chmod +x $out/bin/air
 
         runHook postInstall
       '';
 
-      meta = with lib; {
-        description = "Air monitor web server (SvelteKit adapter-node)";
-        homepage = "https://github.com/MathieuMoalic/air-sensor";
+      meta = {
+        description = "Air web server (SvelteKit adapter-node)";
+        homepage = "https://github.com/MathieuMoalic/air";
         platforms = ["x86_64-linux"];
       };
     };
@@ -117,15 +113,15 @@
       pkgs,
       ...
     }: let
-      cfg = config.services.air-monitor;
+      cfg = config.services.air;
     in {
-      options.services.air-monitor = {
-        enable = lib.mkEnableOption "Air monitor dashboard (SvelteKit adapter-node)";
+      options.services.air = {
+        enable = lib.mkEnableOption "Air dashboard (SvelteKit adapter-node)";
 
         package = lib.mkOption {
           type = lib.types.package;
           default = webPackage;
-          description = "The air-monitor package to use.";
+          description = "The air package to use.";
         };
 
         bindAddr = lib.mkOption {
@@ -154,26 +150,26 @@
 
         databasePath = lib.mkOption {
           type = lib.types.str;
-          default = "/var/lib/air-monitor/air.db";
+          default = "/var/lib/air/air.sqlite";
           description = "Path to the SQLite database file";
         };
       };
 
       config = lib.mkIf cfg.enable {
-        users.users.air-monitor = {
+        users.users.air = {
           isSystemUser = true;
-          group = "air-monitor";
-          home = "/var/lib/air-monitor";
+          group = "air";
+          home = "/var/lib/air";
           createHome = true;
         };
-        users.groups.air-monitor = {};
+        users.groups.air = {};
 
         systemd.tmpfiles.rules = [
-          "d ${lib.dirOf cfg.databasePath} 0750 air-monitor air-monitor - -"
+          "d ${lib.dirOf cfg.databasePath} 0750 air air - -"
         ];
 
-        systemd.services.air-monitor = {
-          description = "Air monitor dashboard";
+        systemd.services.air = {
+          description = "Air dashboard";
           after = ["network.target"];
           wantedBy = ["multi-user.target"];
 
@@ -191,10 +187,10 @@
           };
 
           serviceConfig = {
-            WorkingDirectory = "/var/lib/air-monitor";
-            User = "air-monitor";
-            Group = "air-monitor";
-            StateDirectory = "air-monitor";
+            WorkingDirectory = "/var/lib/air";
+            User = "air";
+            Group = "air";
+            StateDirectory = "air";
             Restart = "always";
             RestartSec = "5s";
             NoNewPrivileges = "yes";
@@ -260,6 +256,6 @@
       web = webPackage;
     };
 
-    nixosModules.air-monitor-service = service;
+    nixosModules.air-service = service;
   };
 }

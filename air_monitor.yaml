@@ -1,5 +1,5 @@
 esphome:
-  name: air-monitor
+  name: air
 
 esp32:
   board: esp32-c3-devkitm-1

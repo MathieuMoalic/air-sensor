@@ -38,12 +38,12 @@
 </script>
 
 <svelte:head>
-  <title>Air Monitor</title>
+  <title>Air</title>
 </svelte:head>
 
 <main>
   <header>
-    <h1>Air Monitor</h1>
+    <h1>Air</h1>
     <div class="controls">
       <label>
         Range

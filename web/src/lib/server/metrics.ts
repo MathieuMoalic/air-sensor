@@ -15,7 +15,7 @@ export interface ParsedMetrics {
 /**
  * Parse ESPHome Prometheus exposition text.
  * Handles lines like:
- *   esphome_sensor_value{id="room_temperature",node="air-monitor",name="Room Temperature",unit="°C"} 28.1
+ *   esphome_sensor_value{id="room_temperature",node="air",name="Room Temperature",unit="°C"} 28.1
  *   esphome_sensor_failed{id="...",...} 0
  */
 export function parseMetrics(text: string, timestamp: number = Date.now()): ParsedMetrics {

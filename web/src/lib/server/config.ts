@@ -5,6 +5,6 @@ export const CONFIG = {
     fetchTimeoutMs: Number(process.env.FETCH_TIMEOUT_MS ?? 5000)
   },
   db: {
-    path: process.env.DB_PATH ?? './data/air.db'
+    path: process.env.DB_PATH ?? './data/air.sqlite'
   }
 } as const;
