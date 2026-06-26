@@ -187,6 +187,7 @@
           };
 
           serviceConfig = {
+            ExecStart = "${cfg.package}/bin/air";
             WorkingDirectory = "/var/lib/air";
             User = "air";
             Group = "air";

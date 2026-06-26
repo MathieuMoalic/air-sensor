@@ -7,16 +7,24 @@
     failed: number;
   }
 
-  interface Props {
-    title: string;
-    unit: string;
+  interface Series {
+    id: string;
+    name: string;
+    color: string;
     points: Point[];
-    color?: string;
   }
 
-  let { title, unit, points, color = '#3b82f6' }: Props = $props();
+  interface Props {
+    title: string;
+    unit?: string;
+    series: Series[];
+    yMin?: number | null;
+    yMax?: number | null;
+  }
 
-  const H = 220;
+  let { title, unit = '', series, yMin = null, yMax = null }: Props = $props();
+
+  const H = 240;
   const padL = 48;
   const padR = 14;
   const padT = 16;
@@ -35,15 +43,23 @@
     return () => ro.disconnect();
   });
 
-  const valid = $derived(points.filter((p) => p.failed === 0));
+  const allPoints = $derived(series.flatMap((s) => s.points));
+  const valid = $derived(allPoints.filter((p) => p.failed === 0));
   const hasData = $derived(valid.length > 1);
 
   const minTs = $derived(hasData ? Math.min(...valid.map((p) => p.ts)) : 0);
   const maxTs = $derived(hasData ? Math.max(...valid.map((p) => p.ts)) : 1);
-  const minVal = $derived(hasData ? Math.min(...valid.map((p) => p.value)) : 0);
-  const maxVal = $derived(hasData ? Math.max(...valid.map((p) => p.value)) : 1);
-  const valLo = $derived(minVal === maxVal ? minVal - 1 : minVal);
-  const valHi = $derived(minVal === maxVal ? maxVal + 1 : maxVal);
+
+  const dataLo = $derived(hasData ? Math.min(...valid.map((p) => p.value)) : 0);
+  const dataHi = $derived(hasData ? Math.max(...valid.map((p) => p.value)) : 1);
+  const span = $derived(dataHi - dataLo);
+
+  const valLo = $derived(
+    yMin !== null ? yMin : dataLo === dataHi ? dataLo - 1 : dataLo - span * 0.05
+  );
+  const valHi = $derived(
+    yMax !== null ? yMax : dataLo === dataHi ? dataHi + 1 : dataHi + span * 0.05
+  );
 
   const plotW = $derived(W - padL - padR);
   const plotH = $derived(H - padT - padB);
@@ -57,17 +73,11 @@
     return padT + (1 - (v - valLo) / (valHi - valLo)) * plotH;
   }
 
-  const path = $derived(
-    hasData
-      ? valid.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.ts).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')
-      : ''
-  );
-
-  const area = $derived(
-    hasData
-      ? `${path} L${x(valid[valid.length - 1].ts).toFixed(1)},${(H - padB).toFixed(1)} L${x(valid[0].ts).toFixed(1)},${(H - padB).toFixed(1)} Z`
-      : ''
-  );
+  function pathFor(points: Point[]): string {
+    const v = points.filter((p) => p.failed === 0);
+    if (v.length === 0) return '';
+    return v.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.ts).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  }
 
   const yTicks = $derived(
     Array.from({ length: 4 }, (_, i) => {
@@ -88,16 +98,35 @@
       : []
   );
 
-  const last = $derived(hasData ? valid[valid.length - 1] : null);
+  const lastValues = $derived(
+    series
+      .map((s) => {
+        const v = s.points.filter((p) => p.failed === 0);
+        return { s, last: v.length > 0 ? v[v.length - 1] : null };
+      })
+      .filter((e) => e.last !== null)
+  );
 </script>
 
 <div class="chart" bind:this={el}>
   <div class="head">
-    <span class="title">{title}</span>
-    {#if last}
-      <span class="val">{last.value.toFixed(1)}<span class="unit">{unit}</span></span>
+    <span class="title">{title}{#if unit}<span class="unit">{unit}</span>{/if}</span>
+    {#if lastValues.length === 1}
+      <span class="val">{lastValues[0].last!.value.toFixed(1)}</span>
     {/if}
   </div>
+
+  {#if series.length > 1}
+    <div class="legend">
+      {#each lastValues as { s, last }}
+        <span class="leg-item">
+          <span class="swatch" style="background:{s.color}"></span>
+          <span class="leg-name">{s.name}</span>
+          <span class="leg-val">{last!.value.toFixed(1)}</span>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   <svg viewBox="0 0 {W} {H}" width={W} height={H} role="img" aria-label={title}>
     {#each yTicks as t}
@@ -109,11 +138,10 @@
     {/each}
 
     {#if hasData}
-      <path d={area} fill={color} fill-opacity="0.12" />
-      <path d={path} fill="none" stroke={color} stroke-width="2" />
-      {#each valid as p}
-        {#if p.failed === 0}
-          <circle cx={x(p.ts)} cy={y(p.value)} r="2.5" fill={color} />
+      {#each series as s (s.id)}
+        {@const p = pathFor(s.points)}
+        {#if p}
+          <path d={p} fill="none" stroke={s.color} stroke-width="2" />
         {/if}
       {/each}
     {:else}
@@ -140,15 +168,41 @@
     font-weight: 600;
     color: #e5e7eb;
   }
+  .unit {
+    margin-left: 0.35rem;
+    color: #9ca3af;
+    font-size: 0.8rem;
+    font-weight: 400;
+  }
   .val {
     font-size: 1.1rem;
     color: #fff;
     font-variant-numeric: tabular-nums;
   }
-  .unit {
-    margin-left: 0.25rem;
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+  }
+  .leg-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+  }
+  .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+  .leg-name {
     color: #9ca3af;
-    font-size: 0.8rem;
+  }
+  .leg-val {
+    color: #e5e7eb;
+    font-variant-numeric: tabular-nums;
   }
   svg {
     display: block;

@@ -1,7 +1,25 @@
 <script lang="ts">
   import LineChart from '$lib/components/LineChart.svelte';
-  import { invalidateAll, goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
+
+  interface Point {
+    ts: number;
+    value: number;
+    failed: number;
+  }
+  interface SeriesIn {
+    id: string;
+    name: string;
+    unit: string;
+    points: Point[];
+  }
+  interface ChartSeries {
+    id: string;
+    name: string;
+    color: string;
+    points: Point[];
+  }
 
   let { data } = $props();
 
@@ -25,6 +43,17 @@
     }
     return c;
   }
+
+  function toSeries(s: SeriesIn): ChartSeries {
+    return { id: s.id, name: s.name, color: colorFor(s.id), points: s.points };
+  }
+
+  const pmIds = new Set(['pm1_0', 'pm2_5', 'pm10']);
+
+  const pmSeries = $derived(data.series.filter((s) => pmIds.has(s.id)).map(toSeries));
+  const otherSeries = $derived(data.series.filter((s) => !pmIds.has(s.id)));
+
+  const hasAny = $derived(data.series.length > 0);
 
   async function refresh() {
     reloading = true;
@@ -60,12 +89,22 @@
     </div>
   </header>
 
-  {#if data.series.length === 0}
+  {#if !hasAny}
     <p class="empty">No data yet. Click <strong>Collect now</strong> to fetch from the ESP.</p>
   {:else}
     <div class="grid">
-      {#each data.series as s (s.id)}
-        <LineChart title={s.name} unit={s.unit} points={s.points} color={colorFor(s.id)} />
+      {#if pmSeries.length > 0}
+        <LineChart title="Particulate Matter" unit="µg/m³" series={pmSeries} yMin={0} />
+      {/if}
+      {#each otherSeries as s (s.id)}
+        {@const isHumidity = s.id === 'room_humidity'}
+        <LineChart
+          title={s.name}
+          unit={s.unit}
+          series={[toSeries(s)]}
+          yMin={isHumidity ? 0 : null}
+          yMax={isHumidity ? 100 : null}
+        />
       {/each}
     </div>
   {/if}
