@@ -5,7 +5,7 @@
 
   interface Point {
     ts: number;
-    value: number;
+    value: number | null;
     failed: number;
   }
   interface SeriesIn {
@@ -72,7 +72,9 @@
 
 <main>
   <header>
-    <h1>Air</h1>
+    <a href="/" class="logo-link">
+      <img src="/logo.png" alt="Air" class="logo" />
+    </a>
     <div class="controls">
       <label>
         Range
@@ -94,7 +96,7 @@
   {:else}
     <div class="grid">
       {#if pmSeries.length > 0}
-        <LineChart title="Particulate Matter" unit="µg/m³" series={pmSeries} yMin={0} />
+        <LineChart title="Particulate Matter" unit="µg/m³" series={pmSeries} yMin={0} maxGapMs={15 * 60 * 1000} />
       {/if}
       {#each otherSeries as s (s.id)}
         {@const isHumidity = s.id === 'room_humidity'}
@@ -104,6 +106,7 @@
           series={[toSeries(s)]}
           yMin={isHumidity ? 0 : null}
           yMax={isHumidity ? 100 : null}
+          maxGapMs={15 * 60 * 1000}
         />
       {/each}
     </div>
@@ -128,9 +131,13 @@
     align-items: center;
     margin-bottom: 1.5rem;
   }
-  h1 {
-    margin: 0;
-    font-size: 1.5rem;
+  .logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+  }
+  .logo {
+    height: 2rem;
   }
   .controls {
     display: flex;

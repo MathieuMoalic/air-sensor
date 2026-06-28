@@ -3,7 +3,7 @@
 
   interface Point {
     ts: number;
-    value: number;
+    value: number | null;
     failed: number;
   }
 
@@ -20,9 +20,10 @@
     series: Series[];
     yMin?: number | null;
     yMax?: number | null;
+    maxGapMs?: number | null;
   }
 
-  let { title, unit = '', series, yMin = null, yMax = null }: Props = $props();
+  let { title, unit = '', series, yMin = null, yMax = null, maxGapMs = null }: Props = $props();
 
   const H = 240;
   const padL = 48;
@@ -43,8 +44,12 @@
     return () => ro.disconnect();
   });
 
+  function isValidPoint(p: Point): p is Point & { value: number } {
+    return p.failed === 0 && p.value !== null && Number.isFinite(p.value);
+  }
+
   const allPoints = $derived(series.flatMap((s) => s.points));
-  const valid = $derived(allPoints.filter((p) => p.failed === 0));
+  const valid = $derived(allPoints.filter(isValidPoint));
   const hasData = $derived(valid.length > 1);
 
   const minTs = $derived(hasData ? Math.min(...valid.map((p) => p.ts)) : 0);
@@ -73,10 +78,64 @@
     return padT + (1 - (v - valLo) / (valHi - valLo)) * plotH;
   }
 
-  function pathFor(points: Point[]): string {
-    const v = points.filter((p) => p.failed === 0);
-    if (v.length === 0) return '';
-    return v.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.ts).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  interface PathSegment {
+    d: string;
+  }
+
+  function inferredMaxGapMs(points: Point[]): number | null {
+    const uniqueTs = Array.from(new Set(points.filter(isValidPoint).map((p) => p.ts))).sort(
+      (a, b) => a - b
+    );
+
+    const gaps = uniqueTs
+      .slice(1)
+      .map((ts, i) => ts - uniqueTs[i])
+      .filter((gap) => gap > 0)
+      .sort((a, b) => a - b);
+
+    if (gaps.length === 0) return null;
+
+    const medianGap = gaps[Math.floor(gaps.length / 2)];
+
+    return medianGap * 2.5;
+  }
+
+  const effectiveGapMs = $derived(maxGapMs ?? inferredMaxGapMs(allPoints));
+
+  function pathFor(points: Point[]): PathSegment[] {
+    const segments: PathSegment[] = [];
+    const sortedPoints = [...points].sort((a, b) => a.ts - b.ts);
+    const gapLimit = effectiveGapMs;
+
+    let currentSegment: (Point & { value: number })[] = [];
+    let previousValid: (Point & { value: number }) | null = null;
+
+    function flush() {
+      if (currentSegment.length > 1) {
+        segments.push({
+          d: currentSegment.map((pt, i) => `${i === 0 ? 'M' : 'L'}${x(pt.ts).toFixed(1)},${y(pt.value).toFixed(1)}`).join(' ')
+        });
+      }
+      currentSegment = [];
+    }
+
+    for (const p of sortedPoints) {
+      if (!isValidPoint(p)) {
+        flush();
+        previousValid = null;
+        continue;
+      }
+
+      if (previousValid && gapLimit !== null && p.ts - previousValid.ts > gapLimit) {
+        flush();
+      }
+
+      currentSegment.push(p);
+      previousValid = p;
+    }
+
+    flush();
+    return segments;
   }
 
   const yTicks = $derived(
@@ -89,7 +148,7 @@
   const xTicks = $derived(
     hasData
       ? (() => {
-          const n = Math.max(3, Math.min(8, Math.floor(plotW / 90)));
+          const n = Math.max(5, Math.min(10, Math.floor(plotW / 70)));
           return Array.from({ length: n }, (_, i) => {
             const ts = minTs + ((maxTs - minTs) * i) / (n - 1);
             return { ts, x: x(ts), label: new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
@@ -98,10 +157,50 @@
       : []
   );
 
+  let clickedPoint: { x: number; y: number; value: number; label: string } | null = $state(null);
+
+  function handleChartClick(event: MouseEvent) {
+    if (!hasData) return;
+
+    const rect = (event.currentTarget as SVGElement).getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+
+    let closest: { pt: Point & { value: number }; dist: number } | null = null;
+    const threshold = Math.max(20, plotW / 30);
+
+    for (const s of series) {
+      for (const p of s.points) {
+        if (isValidPoint(p)) {
+          const px = x(p.ts);
+          const dist = Math.abs(clickX - px);
+          if (!closest || dist < closest.dist) {
+            closest = { pt: p, dist };
+          }
+        }
+      }
+    }
+
+    if (closest && closest.dist < threshold) {
+      const pt = closest.pt;
+      clickedPoint = {
+        x: x(pt.ts),
+        y: y(pt.value),
+        value: pt.value,
+        label: new Date(pt.ts).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
+      };
+    } else {
+      clickedPoint = null;
+    }
+  }
+
+  function clearPopup() {
+    clickedPoint = null;
+  }
+
   const lastValues = $derived(
     series
       .map((s) => {
-        const v = s.points.filter((p) => p.failed === 0);
+        const v = s.points.filter(isValidPoint);
         return { s, last: v.length > 0 ? v[v.length - 1] : null };
       })
       .filter((e) => e.last !== null)
@@ -128,7 +227,7 @@
     </div>
   {/if}
 
-  <svg viewBox="0 0 {W} {H}" width={W} height={H} role="img" aria-label={title}>
+  <svg viewBox="0 0 {W} {H}" width={W} height={H} role="button" aria-label={title} tabindex="0" onclick={handleChartClick} onfocus={clearPopup} onblur={clearPopup} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleChartClick(e as any); }}>
     {#each yTicks as t}
       <line x1={padL} y1={t.y} x2={W - padR} y2={t.y} class="grid" />
       <text x={padL - 8} y={t.y + 3} class="axis" text-anchor="end">{t.v.toFixed(1)}</text>
@@ -139,13 +238,22 @@
 
     {#if hasData}
       {#each series as s (s.id)}
-        {@const p = pathFor(s.points)}
-        {#if p}
-          <path d={p} fill="none" stroke={s.color} stroke-width="2" />
-        {/if}
+        {@const segments = pathFor(s.points)}
+        {#each segments as seg}
+          <path d={seg.d} fill="none" stroke={s.color} stroke-width="2" />
+        {/each}
       {/each}
     {:else}
       <text x={W / 2} y={H / 2} class="empty" text-anchor="middle">No valid data</text>
+    {/if}
+
+    {#if clickedPoint}
+      <g class="popup" transform="translate({clickedPoint.x}, {clickedPoint.y})">
+        <circle cx="0" cy="0" r="6" fill="#fff" />
+        <text x="0" y="-12" class="popup-text" text-anchor="middle">{clickedPoint.value.toFixed(1)}</text>
+        <text x="0" y="22" class="popup-label" text-anchor="middle">{clickedPoint.label}</text>
+        <line x1="0" y1="6" x2="0" y2={H - padB} class="popup-line" />
+      </g>
     {/if}
   </svg>
 </div>
@@ -220,5 +328,22 @@
     fill: #6b7280;
     font-size: 12px;
     font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .popup {
+    pointer-events: none;
+  }
+  .popup-text {
+    fill: #fff;
+    font-size: 11px;
+    font-weight: 60 solid;
+  }
+  .popup-label {
+    fill: #9ca3af;
+    font-size: 10px;
+  }
+  .popup-line {
+    stroke: #6b7280;
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
   }
 </style>

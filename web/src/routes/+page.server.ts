@@ -8,18 +8,33 @@ export const load: PageServerLoad = async ({ url }) => {
   const rows = getReadingsSince(sinceMs);
   const sensors = listSensors();
 
-  const seriesMap = new Map<string, { id: string; name: string; unit: string; points: { ts: number; value: number; failed: number }[] }>();
+  const seriesMap = new Map<string, { id: string; name: string; unit: string; points: { ts: number; value: number | null; failed: number }[] }>();
   for (const s of sensors) {
     seriesMap.set(s.id, { id: s.id, name: s.name, unit: s.unit, points: [] });
   }
 
+  // Collect all timestamps and map rows by (sensor_id, ts)
+  const timestamps = Array.from(new Set((rows as ReadingRow[]).map((r) => r.ts))).sort((a, b) => a - b);
+
+  const pointsBySeries = new Map<string, Map<number, { ts: number; value: number | null; failed: number }>>();
+
   for (const r of rows as ReadingRow[]) {
-    let s = seriesMap.get(r.sensor_id);
-    if (!s) {
-      s = { id: r.sensor_id, name: r.name, unit: r.unit, points: [] };
-      seriesMap.set(r.sensor_id, s);
+    let byTs = pointsBySeries.get(r.sensor_id);
+    if (!byTs) {
+      byTs = new Map();
+      pointsBySeries.set(r.sensor_id, byTs);
     }
-    s.points.push({ ts: r.ts, value: r.value, failed: r.failed });
+    byTs.set(r.ts, { ts: r.ts, value: r.value, failed: r.failed });
+  }
+
+  // Fill in null points for missing timestamps
+  for (const s of seriesMap.values()) {
+    const byTs = pointsBySeries.get(s.id) ?? new Map();
+
+    s.points = timestamps.map((ts) => {
+      const point = byTs.get(ts);
+      return point ?? { ts, value: null, failed: 1 };
+    });
   }
 
   return {

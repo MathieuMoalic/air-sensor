@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Air">
+  <defs>
+    <linearGradient id="airGradient" x1="128" y1="96" x2="384" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0b0e14"/>
+  <rect x="18" y="18" width="476" height="476" rx="96" fill="none" stroke="#1f2430" stroke-width="28"/>
+  <path d="M158 382 L238 130 C244 112 268 112 274 130 L354 382"
+        fill="none" stroke="url(#airGradient)" stroke-width="54"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M204 294 H308" fill="none" stroke="#e5e7eb" stroke-width="42" stroke-linecap="round"/>
+  <path d="M138 180 C180 146 220 148 256 182 C294 218 340 216 382 180"
+        fill="none" stroke="#10b981" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="384" cy="180" r="15" fill="#10b981"/>
+</svg>
