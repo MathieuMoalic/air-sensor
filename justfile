@@ -1,4 +1,4 @@
-default:
+flash-esp:
   uv run esphome run air_monitor.yaml
 
 fetch:
